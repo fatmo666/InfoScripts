@@ -36,7 +36,7 @@ class BaseObject(object):
         self.logger.setLevel(logging.INFO)
 
         logFileName = os.getcwd() + '/log/' + datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + '.txt'
-        rHandler = RotatingFileHandler(logFileName, maxBytes=1 * 1024, backupCount=1)
+        rHandler = RotatingFileHandler(logFileName, maxBytes=100 * 1024, backupCount=3)
         rHandler.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         rHandler.setFormatter(formatter)
@@ -76,6 +76,11 @@ class BaseObject(object):
         return args
 
     async def sendRequest(self, url):
+        """
+        发送http请求
+        :param url:
+        :return:
+        """
         sem = asyncio.Semaphore(1024)
         try:
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:

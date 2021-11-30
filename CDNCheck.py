@@ -5,7 +5,7 @@ import re
 import socket
 from asyncio import CancelledError
 
-import aiohttp
+import aiohttp, aiodns
 import dns.resolver
 import geoip2.database
 import ipaddress
@@ -45,33 +45,34 @@ class CdnInfo(BaseObject):
             newLoop = asyncio.new_event_loop()
             asyncio.set_event_loop(newLoop)
             loop = asyncio.get_event_loop()
+            resolver = aiodns.DNSResolver(loop=loop)
 
             for domain in self.domains:
                 if os.path.exists(os.getcwd() + '/result/' + domain + '/') is False:
                     os.mkdir(os.getcwd() + '/result/' + domain + '/')
 
-                tasks.append(asyncio.ensure_future(self.checkCDN(domain)))
+                tasks.append(asyncio.ensure_future(self.checkCDN(domain, resolver)))
 
             loop.run_until_complete(asyncio.wait(tasks))
         except KeyboardInterrupt:
-            self.logger.info('[+]Break From Queue.')
+            self.logger.info('[-]用户手动终止程序.')
         except CancelledError:
             pass
 
         self.writeResult()
 
 
-    async def checkCDN(self, domain):
+    async def checkCDN(self, domain, resolver):
         self.queryResult[domain] = {}
         self.queryResult[domain]['isCdn'] = "0"
         isCDNByAddr = 0
 
         #尝试获取IP地址
         if not re.search(r'\d+\.\d+\.\d+\.\d+', domain):
-            isCDNByAddr, ip = await self.getIP(domain)
+            isCDNByAddr, ipList = await self.getIP(domain, resolver)
         else:
-            ip = domain
-        if ip is None:
+            ipList = list(domain)
+        if ipList is None:
             return
 
         if isCDNByAddr != 0:
@@ -79,12 +80,12 @@ class CdnInfo(BaseObject):
             self.queryResult[domain]['ipAddr'] = isCDNByAddr
 
 
-        cdnSegment, segment = self.checkSegment(ip)
+        cdnSegment, segment = self.checkSegment(ipList)
         if cdnSegment:
             self.queryResult[domain]['isCdn'] = "1"
             self.queryResult[domain]['segment'] = segment
 
-        cdnASN = self.checkASN(ip)
+        cdnASN = self.checkASN(ipList)
         if cdnASN:
             self.queryResult[domain]['isCdn'] = "1"
             self.queryResult[domain]['ASN'] = cdnASN
@@ -95,7 +96,7 @@ class CdnInfo(BaseObject):
             self.queryResult[domain]['header'] = header
 
         if not re.search(r'\d+\.\d+\.\d+\.\d+', domain):
-            cnameList = await self.getCNAMES(domain)
+            cnameList = await self.getCNAMES(domain, resolver)
             match = False
             result = None
             for i in cnameList:
@@ -129,49 +130,82 @@ class CdnInfo(BaseObject):
                         json.dump(self.queryResult[domain], fpResult, indent=2)
 
 
-    async def getIP(self, domain):
+    async def getIP(self, domain, resolver):
         """
         尝试获得域名的IP地址
         :param domain:
         :return:
         """
+
         try:
-            await asyncio.sleep(1)
-            addr = socket.getaddrinfo(domain, None)
-            if len(addr) > 1:
-                return len(addr), str(addr[0][4][0])
+            answer = await resolver.query(domain, 'A')
+            ipList = []
+            for ip in answer:
+                ipList.append(ip.host)
+            if len(answer) > 1:
+                return len(answer), ipList
             else:
-                return 0, str(addr[0][4][0])
+                return 0, ipList
         except:
             return 0, None
 
-    def checkSegment(self, ip):
+        # try:
+        #     # await asyncio.sleep(1)
+        #     addr = socket.getaddrinfo(domain, None)
+        #     if len(addr) > 1:
+        #         return len(addr), str(addr[0][4][0])
+        #     else:
+        #         return 0, str(addr[0][4][0])
+        # except:
+        #     return 0, None
+
+    def checkSegment(self, ipList):
+        """
+        根据Segment判断CDN
+        :param ipList:
+        :return:
+        """
         try:
-            for segment in segments:
-                if ipaddress.ip_address(ip) in ipaddress.ip_network(segment):
-                    return True, segment
+            for ip in ipList:
+                for segment in segments:
+                    if ipaddress.ip_address(ip) in ipaddress.ip_network(segment):
+                        return True, segment
             return False, None
         except:
             return False, None
 
-    def checkASN(self, ip):
+    def checkASN(self, ipList):
+        """
+        根据ASN判断
+        :param ipList:
+        :return:
+        """
         try:
-            with geoip2.database.Reader('./Config/GeoLite2-ASN.mmdb') as reader:
-                response = reader.asn(ip)
-                for i in ASNS:
-                    if response.autonomous_system_number == int(i):
-                        return True
+            for ip in ipList:
+                with geoip2.database.Reader('./Config/GeoLite2-ASN.mmdb') as reader:
+                    response = reader.asn(ip)
+                    for i in ASNS:
+                        if response.autonomous_system_number == int(i):
+                            return True
         except:
             return False
         return False
 
     async def checkHeader(self, domain):
+        """
+        检查HTTP请求头
+        :param domain:需请求的域名
+        :return:共两个返回值:
+        1. 检查结果,True/False
+        2. 若为True，命中的那个key
+        """
         sem = asyncio.Semaphore(1024)
         try:
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:
                 async with sem:
                     async with session.get(domain, timeout=20, headers=self.headers) as req:
                         await asyncio.sleep(1)
+                        # 遍历字典
                         for header in headers:
                             if header in dict(req.headers).keys():
                                 return True, header
@@ -181,32 +215,46 @@ class CdnInfo(BaseObject):
         except ConnectionResetError:
             pass
         except Exception as e:
-            self.logger.error('[-]CDNCheck-Check header: Resolve {} fail'.format(domain))
+            self.logger.error('[-]CDNCheck-Check header: {} http请求失败'.format(domain))
 
         return False, ""
 
-    async def getCNAMES(self, domain):
+    async def getCNAMES(self, domain, resolver):
+        """
+        根据DNS，CNAME解析结果判断，循环解析cname并推入列表
+        :param domain:须解析的域名
+        :param resolver:异步DNS解析对象
+        :return:解析出的别名列表
+        """
         cnames = []
-        cname = self.getCNAME(domain)
+        cname = await self.getCNAME(domain, resolver)
         if cname is not None:
             cnames.append(cname)
         while (cname != None):
-            cname = self.getCNAME(cname)
+            cname = await self.getCNAME(cname, resolver)
             if cname is not None:
                 cnames.append(cname)
         return cnames
 
-    def getCNAME(self, domain):
+    async def getCNAME(self, domain, resolver):
+        """
+        异步cname解析
+        :param domain:要解析的域名
+        :param resolver:异步DNS解析对象
+        :return:解析结果
+        """
         try:
             # # 需要在域名前添加‘www.’
             # if domain.startswith('www.'):
             #     pass
             # else:
             #     domain = 'www.' + domain
-            answer = dns.resolver.resolve(domain, 'CNAME')
+            # answer = dns.resolver.resolve(domain, 'CNAME')
+            answer = await resolver.query(domain, 'CNAME')
         except:
             return None
-        cname = [_.to_text() for _ in answer][0]
+        # cname = [_.to_text() for _ in answer][0]
+        cname = answer.cname
         return cname
 
     def matched(self, obj, list):
