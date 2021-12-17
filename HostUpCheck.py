@@ -9,9 +9,9 @@ from BaseObject import BaseObject
 
 class HostUpCheck(BaseObject):
 
-    def __init__(self):
+    def __init__(self, domain):
         BaseObject.__init__(self)
-        self.domains = []
+        self.domains = domain
         self.queryResult = {}
         self.resultDictHostToIp = {}
 

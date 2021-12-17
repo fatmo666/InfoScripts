@@ -1,3 +1,4 @@
+# 参考项目：https://github.com/timwhitez/Frog-checkCDN
 import asyncio
 import json
 import os
@@ -147,6 +148,7 @@ class CdnInfo(BaseObject):
             else:
                 return 0, ipList
         except:
+            self.logger.error('[-]CDNCheck-Check getIP: {} DNS A解析失败'.format(domain))
             return 0, None
 
         # try:
@@ -188,6 +190,7 @@ class CdnInfo(BaseObject):
                         if response.autonomous_system_number == int(i):
                             return True
         except:
+            self.logger.error('[-]CDNCheck-Check checkASN: {} checkASN失败'.format(ipList))
             return False
         return False
 
@@ -215,7 +218,7 @@ class CdnInfo(BaseObject):
         except ConnectionResetError:
             pass
         except Exception as e:
-            self.logger.error('[-]CDNCheck-Check header: {} http请求失败'.format(domain))
+            self.logger.info('[-]CDNCheck-Check header: {} http请求失败'.format(domain))
 
         return False, ""
 

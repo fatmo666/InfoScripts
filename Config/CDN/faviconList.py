@@ -1,0 +1,3 @@
+faviconList = [
+    '/favicon.ico'
+]
