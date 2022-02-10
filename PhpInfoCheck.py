@@ -2,6 +2,8 @@ import asyncio
 import json
 import os
 from asyncio import CancelledError
+
+import aiohttp
 from bs4 import BeautifulSoup, element
 
 from Config.phpinfo.phpinfo import phpinfoList
@@ -9,6 +11,9 @@ from BaseObject import BaseObject
 
 
 class PhpInfoCheck(BaseObject):
+    """
+    本脚本为项目：https://github.com/proudwind/phpinfo_scanner ,的修改与补充
+    """
     def __init__(self):
         BaseObject.__init__(self)
         self.domains = []
@@ -70,16 +75,48 @@ class PhpInfoCheck(BaseObject):
         self.queryResult[domain] = {}
 
         for item in phpinfoList:
-            response = await self.sendRequest('http://' + domain + '/' + item)
-            if response != False:
-                break
+            sem = asyncio.Semaphore(1024)
+            try:
+                async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:
+                    async with sem:
+                        async with session.get('http://' + domain + '/' + item, timeout=20, headers=self.headers) as req:
+                            await asyncio.sleep(1)
+                            response = await req.text('utf-8', 'ignore')
+                            status = req.status
+                            if status == 200:
+                                self.infoCollecter(domain, response)
+                                self.get_parsed_info(domain)
+            except CancelledError:
+                pass
+            except ConnectionResetError:
+                pass
+            except Exception as e:
+                return None
 
-        self.infoCollecter(domain, response)
-        self.get_parsed_info(domain)
 
     async def getDomainIP(self, domain):
-        await self.infoCollect(domain)
-        return self.queryResult[domain]['PHP Variables']["$_SERVER['SERVER_ADDR']"]
+        for item in phpinfoList:
+            sem = asyncio.Semaphore(1024)
+            try:
+                async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:
+                    async with sem:
+                        async with session.get('http://' + domain + '/' + item, timeout=20,
+                                               headers=self.headers) as req:
+                            await asyncio.sleep(1)
+                            response = await req.text('utf-8', 'ignore')
+                            status = req.status
+                            if status == 200:
+                                self.infoCollecter(domain, response)
+                                self.get_parsed_info(domain)
+                                return self.queryResult[domain]['PHP Variables']["$_SERVER['SERVER_ADDR']"]
+            except CancelledError:
+                pass
+            except ConnectionResetError:
+                pass
+            except Exception as e:
+                pass
+        return None
+
 
     def infoCollecter(self, domain, response):
         self.queryResult[domain]["BaseInfo"] = {}

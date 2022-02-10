@@ -119,15 +119,15 @@ class CdnInfo(BaseObject):
         保存结果
         :return:
         """
-        with open('./CheckResult/' + self.fileName + "/" + 'isCDN' + '.txt', 'a') as fpIs:
-            with open('./CheckResult/' + self.fileName + "/" + 'isNotCDN' + '.txt', 'a') as fpIsNot:
+        with open(os.path.dirname(os.path.abspath(__file__)) + '/CheckResult/' + self.fileName + "/" + 'isCDN' + '.txt', 'a') as fpIs:
+            with open(os.path.dirname(os.path.abspath(__file__)) + '/CheckResult/' + self.fileName + "/" + 'isNotCDN' + '.txt', 'a') as fpIsNot:
                 for domain in self.domains:
                     if self.queryResult[domain]['isCdn'] == '1':
                         fpIs.write(domain + "\n")
                     else:
                         fpIsNot.write(domain + "\n")
 
-                    with open('./result/' + domain + "/" + 'cdnInfo' + '.json', 'w') as fpResult:
+                    with open(os.path.dirname(os.path.abspath(__file__)) + '/result/' + domain + "/" + 'cdnInfo' + '.json', 'w') as fpResult:
                         json.dump(self.queryResult[domain], fpResult, indent=2)
 
 

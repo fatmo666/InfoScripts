@@ -2,6 +2,7 @@ import asyncio, aiohttp
 import datetime
 import logging
 import os
+import random
 import sys
 import time
 from asyncio import CancelledError
@@ -21,7 +22,10 @@ class BaseObject(object):
         #初始化日志
         self.initLog()
 
-        #设置HTTP请求头
+        #User-Agent文件路径
+        self.userAgentFile = os.path.dirname(os.path.abspath(__file__)) + "/Config/HttpHeader/user-agents.txt"
+
+        # 设置HTTP请求头
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) '
                           'Chrome/79.0.3945.130 Safari/537.36'
@@ -47,6 +51,12 @@ class BaseObject(object):
 
         self.logger.addHandler(rHandler)
         self.logger.addHandler(console)
+
+    def fetchUserAgent(self):
+        with open(self.userAgentFile, 'r') as fp:
+            userAgent = random.sample(fp.readlines(), 1)[0]
+
+        return userAgent
 
     def initDir(self):
         """
@@ -74,6 +84,10 @@ class BaseObject(object):
 
         args = parser.parse_args()
         return args
+
+    def buildHeader(self):
+        userAgent = self.fetchUserAgent()
+        self.headers['User-Agent'] = userAgent
 
     async def sendRequest(self, url):
         """

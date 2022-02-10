@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 from asyncio import CancelledError
 import aiohttp
@@ -7,6 +8,8 @@ from bs4 import BeautifulSoup
 
 from BaseObject import BaseObject
 from ShodanObject import ShodanObject
+from PhpInfoCheck import PhpInfoCheck
+from CensysObject import CensysObject
 
 class CDNByPass(BaseObject):
 
@@ -48,7 +51,18 @@ class CDNByPass(BaseObject):
         except CancelledError:
             pass
 
-        # self.writeResult()
+        self.writeResult()
+
+    def writeResult(self):
+        """
+        保存结果
+        :return:
+        """
+
+        for domain in self.domains:
+            with open(os.path.dirname(os.path.abspath(__file__)) + '/result/' + domain + "/" + 'cdnPassInfo' + '.txt', 'a') as fpResult:
+                for item in self.queryResult[domain]:
+                    fpResult.write(item + "\n")
 
     async def cdnByPass(self, domain):
         self.queryResult[domain] = []
@@ -56,18 +70,39 @@ class CDNByPass(BaseObject):
         icoHashString = await self.calcFaviconHash(domain)
         iconList = self.shodanObject.getIcoHashList(icoHashString)
         for item in iconList:
-            if await self.checkIP(item):
-                self.queryResult[domain].append(item)
+            self.queryResult[domain].append(item)
+            # if await self.checkIP(item):
+            #     self.queryResult[domain].append(item)
 
         titleString = await self.getDomainTitle(domain)
         if titleString != False:
             titleList = self.shodanObject.getTitleList("title:" + titleString)
             for item in titleList:
-                if await self.checkIP(item):
-                    self.queryResult[domain].append(item)
+                self.queryResult[domain].append(item)
+                # if await self.checkIP(item):
+                #     self.queryResult[domain].append(item)
+
+        phpinfoCheck = PhpInfoCheck()
+        phpinfoIP = await phpinfoCheck.getDomainIP(domain)
+        if phpinfoIP != None:
+            self.queryResult[domain].append(phpinfoIP)
+            # if await self.checkIP(phpinfoIP):
+            #     self.queryResult[domain].append(phpinfoIP)
+
+        censysCheck = CensysObject()
+        censysIp = await censysCheck.getIP(domain)
+        if censysIp != None:
+            for item in censysIp:
+                self.queryResult[domain].append(item)
+
         pass
 
     async def getDomainTitle(self, domain):
+        """
+        取出目标title
+        :param domain:
+        :return:
+        """
         response = await self.sendRequest('http://' + domain)
         if response != False:
             soup = BeautifulSoup(response, 'lxml')
@@ -76,6 +111,11 @@ class CDNByPass(BaseObject):
             return False
 
     async def checkIP(self, ip):
+        """
+        验证ip是否可以正常访问
+        :param ip:
+        :return:
+        """
         targetFir = 'http://' + ip + '/'
         targetSec = 'https://' + ip + '/'
 
@@ -88,6 +128,11 @@ class CDNByPass(BaseObject):
             return True
 
     async def calcFaviconHash(self, domain):
+        """
+        计算目标站点的icon-hash
+        :param domain:
+        :return:
+        """
         requestUrl = 'http://' + domain + '/favicon.ico'
         # responseContent = requests.get(requestUrl, verify=False).content
 
@@ -109,6 +154,17 @@ class CDNByPass(BaseObject):
 
         iconHash = mmh3.hash(codecs.lookup('base64').encode(responseContent)[0])
         return 'http.favicon.hash:' + str(iconHash)
+
+    async def getIPFromPhpinfo(self, domain):
+        """
+        从phpinfo中获取ip
+        :param domain:
+        :return:
+        """
+
+        phpinfoCheck = PhpInfoCheck()
+        return await phpinfoCheck.getDomainIP('www.wzonline.zj.cn')
+
 
 if __name__ == '__main__':
     cdnByPass = CDNByPass()

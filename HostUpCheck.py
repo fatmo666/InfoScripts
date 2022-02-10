@@ -9,9 +9,9 @@ from BaseObject import BaseObject
 
 class HostUpCheck(BaseObject):
 
-    def __init__(self, domain):
+    def __init__(self):
         BaseObject.__init__(self)
-        self.domains = domain
+        self.domains = []
         self.queryResult = {}
         self.resultDictHostToIp = {}
 
@@ -39,6 +39,7 @@ class HostUpCheck(BaseObject):
             asyncio.set_event_loop(newLoop)
             loop = asyncio.get_event_loop()
 
+
             for domain in self.domains:
                 if os.path.exists(os.getcwd() + '/result/' + domain + '/') is False:
                     os.mkdir(os.getcwd() + '/result/' + domain + '/')
@@ -55,7 +56,6 @@ class HostUpCheck(BaseObject):
 
     async def CheckHostUp(self, domain):
         self.queryResult[domain] = {}
-
         ping_scan_raw = await self.scanHostUp(domain)
         for item in ping_scan_raw['scan'].items():
             if item[1]['status']['state'] == "up":
