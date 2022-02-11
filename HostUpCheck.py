@@ -1,9 +1,14 @@
+import argparse
 import json
 import os
 import asyncio
+import sys
 from asyncio import CancelledError
 
-import nmap
+import IPy
+import aioping
+from ipaddress import IPv4Network, IPv4Address
+from socket import AddressFamily
 
 from BaseObject import BaseObject
 
@@ -18,12 +23,19 @@ class HostUpCheck(BaseObject):
         self.hostUp = []
         self.hostDown = []
 
+        self.writeFlag = True
+
         args = self.argparser()
         # 生成主域名列表，待检测域名入队
         target = args.target
         if not os.path.isfile(target):
             # target = 'http://' + target
-            self.domains.append(target)
+            if str(target.split('.')[-1]) >= '0/24':
+                self.writeFlag = False
+                for ip in IPy.IP(target):
+                    self.domains.append(str(ip))
+            else:
+                self.domains.append(target)
         elif os.path.isfile(target):
             with open(target, 'r+', encoding='utf-8') as f:
                 for domain in f:
@@ -38,13 +50,15 @@ class HostUpCheck(BaseObject):
             newLoop = asyncio.new_event_loop()
             asyncio.set_event_loop(newLoop)
             loop = asyncio.get_event_loop()
+            sem = asyncio.Semaphore(256)
 
 
             for domain in self.domains:
-                if os.path.exists(os.getcwd() + '/result/' + domain + '/') is False:
-                    os.mkdir(os.getcwd() + '/result/' + domain + '/')
+                if self.writeFlag == True:
+                    if os.path.exists(os.getcwd() + '/result/' + domain + '/') is False:
+                        os.mkdir(os.getcwd() + '/result/' + domain + '/')
 
-                tasks.append(asyncio.ensure_future(self.CheckHostUp(domain)))
+                tasks.append(asyncio.ensure_future(self.CheckHostUp(domain, sem)))
 
             loop.run_until_complete(asyncio.wait(tasks))
         except KeyboardInterrupt:
@@ -54,34 +68,54 @@ class HostUpCheck(BaseObject):
 
         self.writeResult()
 
-    async def CheckHostUp(self, domain):
+    async def CheckHostUp(self, domain, sem):
         self.queryResult[domain] = {}
-        ping_scan_raw = await self.scanHostUp(domain)
-        for item in ping_scan_raw['scan'].items():
-            if item[1]['status']['state'] == "up":
-                self.hostUp.append(domain)
-                self.queryResult[domain]['HostUp'] = "1"
-                self.resultDictHostToIp[item[1]['hostnames'][0]['name']] = item[0]
+        pingResult = await self.pingAIO(domain, sem)
+        if pingResult == True:
+            self.hostUp.append(domain)
+            self.queryResult[domain]['HostUp'] = "1"
+            return True
+        else:
+            self.hostDown.append(domain)
+            self.queryResult[domain]['HostUp'] = "0"
+            return False
+
+
+    async def pingAIO(self, target, sem):
+        async with sem:
+            print("Start:", target)
+            try:
+                delay = await aioping.ping(
+                    str(target), 10, family=AddressFamily.AF_INET
+                )
                 return True
-            else:
-                self.hostDown.append(domain)
-                self.queryResult[domain]['HostUp'] = "0"
+            except TimeoutError:
+                return False
+            except OSError as error:
                 return False
 
-    async def scanHostUp(self, domain):
-        await asyncio.sleep(1)
-        nm = nmap.PortScanner()  # 设置为nmap扫描状态。
-        ping_scan_raw = nm.scan(hosts=domain,
-                                arguments='-sn')  # hosts可以是单个IP地址也可以是一整个网段。    arguments就是运用什么方式扫描，-sn就是ping扫描。
-        return ping_scan_raw
+    def argparser(self):
+        """
+        解析参数
+        :return:参数解析结果
+        """
+        parser = argparse.ArgumentParser(description='InfoScripts can help you collect target\'s information',
+                                         epilog='\tUsage:\npython3 ' + sys.argv[0] + " --target www.baidu.com --timeout 10")
+        parser.add_argument('--target', '-t', help='A target like www.example.com or subdomains.txt, target can be txt file,a domain, a ip address or a class c ip address like 192.168.0.0/24, when target is class c address, the script\
+         will not create result folder for every ip', required=True)
+        parser.add_argument('--timeout', help='Set the ping\'s timeout', default=3, required=True)
+
+        args = parser.parse_args()
+        return args
 
     def writeResult(self):
         with open('./CheckResult/' + self.fileName + "/" + 'HostUp' + '.txt', 'a') as fp:
-            for domain in self.domains:
+            for domain in self.hostUp:
                 fp.write(domain + "\n")
 
-                with open(os.getcwd() + '/result/' + domain + '/' + 'HostUpInfo.json', 'w') as fpResult:
-                    json.dump(self.queryResult[domain], fpResult, indent=2)
+                if self.writeFlag == True:
+                    with open(os.getcwd() + '/result/' + domain + '/' + 'HostUpInfo.json', 'w') as fpResult:
+                        json.dump(self.queryResult[domain], fpResult, indent=2)
 
 
 if __name__ == '__main__':
