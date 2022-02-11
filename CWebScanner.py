@@ -121,7 +121,7 @@ class CWebScanner(BaseObject):
 
             for port in self.ports:
                 for ip in ipLists:
-                    url = "https://" + ip + ":" + port
+                    url = "http://" + ip + ":" + port
                     response, header = await self.sendRequest(url)
                     if response != False:
                         self.resultList.append(ip)
