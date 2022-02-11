@@ -28,6 +28,7 @@ class HostUpCheck(BaseObject):
         args = self.argparser()
         # 生成主域名列表，待检测域名入队
         target = args.target
+        self.timeout = args.timeout
         if not os.path.isfile(target):
             # target = 'http://' + target
             if str(target.split('.')[-1]) >= '0/24':
@@ -70,7 +71,7 @@ class HostUpCheck(BaseObject):
 
     async def CheckHostUp(self, domain, sem):
         self.queryResult[domain] = {}
-        pingResult = await self.pingAIO(domain, sem)
+        pingResult = await self.pingAIO(domain, sem, self.timeout)
         if pingResult == True:
             self.hostUp.append(domain)
             self.queryResult[domain]['HostUp'] = "1"
@@ -80,13 +81,12 @@ class HostUpCheck(BaseObject):
             self.queryResult[domain]['HostUp'] = "0"
             return False
 
-
-    async def pingAIO(self, target, sem):
+    async def pingAIO(self, target, sem, timeout):
         async with sem:
-            print("Start:", target)
+            # print("Start:", target)
             try:
                 delay = await aioping.ping(
-                    str(target), 10, family=AddressFamily.AF_INET
+                    str(target), timeout, family=AddressFamily.AF_INET
                 )
                 return True
             except TimeoutError:
@@ -103,20 +103,19 @@ class HostUpCheck(BaseObject):
                                          epilog='\tUsage:\npython3 ' + sys.argv[0] + " --target www.baidu.com --timeout 10")
         parser.add_argument('--target', '-t', help='A target like www.example.com or subdomains.txt, target can be txt file,a domain, a ip address or a class c ip address like 192.168.0.0/24, when target is class c address, the script\
          will not create result folder for every ip', required=True)
-        parser.add_argument('--timeout', help='Set the ping\'s timeout', default=3, required=True)
+        parser.add_argument('--timeout', help='Set the ping\'s timeout', default=3, required=False)
 
         args = parser.parse_args()
         return args
 
     def writeResult(self):
-        with open('./CheckResult/' + self.fileName + "/" + 'HostUp' + '.txt', 'a') as fp:
+        with open(os.path.dirname(os.path.abspath(__file__)) + '/CheckResult/' + self.fileName + "/" + 'HostUp' + '.txt', 'a') as fp:
             for domain in self.hostUp:
                 fp.write(domain + "\n")
 
                 if self.writeFlag == True:
-                    with open(os.getcwd() + '/result/' + domain + '/' + 'HostUpInfo.json', 'w') as fpResult:
+                    with open(os.path.dirname(os.path.abspath(__file__)) + '/result/' + domain + '/' + 'HostUpInfo.json', 'w') as fpResult:
                         json.dump(self.queryResult[domain], fpResult, indent=2)
-
 
 if __name__ == '__main__':
     hostUpInfo = HostUpCheck()
