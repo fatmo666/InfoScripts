@@ -53,6 +53,7 @@ class CWebScanner(BaseObject):
 
     async def handleTarget(self, target, resolver):
         #处理给定扫描目标
+        rawTarget = target
         try:
             if int(target.split('.')[-1]) >= 0:
                 result = ""
@@ -64,7 +65,17 @@ class CWebScanner(BaseObject):
         except:
             result = await self.getIP(target, resolver)
             if result != None:
-                return result
+                target = result.host
+                if int(target.split('.')[-1]) >= 0:
+                    result = ""
+                    for item in target.split('.')[:3]:
+                        result += item
+                        result += "."
+                    result += '0/24'
+                    return result
+            else:
+                self.logger.error('[-]Input error: 输入有误: {}'.format(rawTarget))
+                exit(1)
 
     async def getIP(self, domain, resolver):
         """
@@ -87,12 +98,13 @@ class CWebScanner(BaseObject):
             asyncio.set_event_loop(newLoop)
             loop = asyncio.get_event_loop()
             resolver = aiodns.DNSResolver(loop=loop)
+            sem = asyncio.Semaphore(256)
 
             for domain in self.domains:
                 if os.path.exists(os.getcwd() + '/result/' + domain + '/') is False:
                     os.mkdir(os.getcwd() + '/result/' + domain + '/')
 
-                tasks.append(asyncio.ensure_future(self.scan(domain, resolver)))
+                tasks.append(asyncio.ensure_future(self.scan(domain, resolver, sem)))
 
             loop.run_until_complete(asyncio.wait(tasks))
         except KeyboardInterrupt:
@@ -102,25 +114,26 @@ class CWebScanner(BaseObject):
 
         self.writeResult()
 
-    async def scan(self, target, resolver):
-        target = await self.handleTarget(target, resolver)
-        ipLists = self.getIPList(target)
+    async def scan(self, target, resolver, sem):
+        async with sem:
+            target = await self.handleTarget(target, resolver)
+            ipLists = self.getIPList(target)
 
-        for port in self.ports:
-            for ip in ipLists:
-                url = "http://" + ip + ":" + port
-                response, header = await self.sendRequest(url)
-                if response != False:
-                    self.resultList.append(ip)
-                    self.queryResult[ip] = {}
-                    self.queryResult[ip]["ip"] = ip
-                    header = dict(header)
-                    if "Server" in header.keys():
-                        self.queryResult[ip]["server"] = header['Server']
-                    if BeautifulSoup(response, 'lxml').title != None:
-                        self.queryResult[ip]["title"] = BeautifulSoup(response, 'lxml').title.text.strip('\n').strip()
+            for port in self.ports:
+                for ip in ipLists:
+                    url = "https://" + ip + ":" + port
+                    response, header = await self.sendRequest(url)
+                    if response != False:
+                        self.resultList.append(ip)
+                        self.queryResult[ip] = {}
+                        self.queryResult[ip]["ip"] = ip
+                        header = dict(header)
+                        if "Server" in header.keys():
+                            self.queryResult[ip]["server"] = header['Server']
+                        if BeautifulSoup(response, 'lxml').title != None:
+                            self.queryResult[ip]["title"] = BeautifulSoup(response, 'lxml').title.text.strip('\n').strip()
 
-        return None
+            return None
 
 
     def writeResult(self):
@@ -152,7 +165,7 @@ class CWebScanner(BaseObject):
         try:
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:
                 async with sem:
-                    async with session.get(url, timeout=20, headers=self.headers) as req:
+                    async with session.get(url, timeout=20, headers=self.headers, verify_ssl=None) as req:
                         await asyncio.sleep(1)
                         response = await req.text('utf-8', 'ignore')
                         header = req.headers
