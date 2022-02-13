@@ -147,8 +147,8 @@ class CdnInfo(BaseObject):
                 return len(answer), ipList
             else:
                 return 0, ipList
-        except:
-            self.logger.error('[-]CDNCheck-Check getIP: {} DNS A解析失败'.format(domain))
+        except Exception as e:
+            # self.logger.error('[-]CDNCheck-Check getIP: {} DNS A解析失败:{}'.format(domain, str(e)))
             return 0, None
 
         # try:
@@ -182,16 +182,16 @@ class CdnInfo(BaseObject):
         :param ipList:
         :return:
         """
-        try:
-            for ip in ipList:
-                with geoip2.database.Reader('./Config/GeoLite2-ASN.mmdb') as reader:
+        for ip in ipList:
+            try:
+                with geoip2.database.Reader('./Config/CDN/GeoLite2-ASN.mmdb') as reader:
                     response = reader.asn(ip)
                     for i in ASNS:
                         if response.autonomous_system_number == int(i):
                             return True
-        except:
-            self.logger.error('[-]CDNCheck-Check checkASN: {} checkASN失败'.format(ipList))
-            return False
+            except Exception as e:
+                self.logger.error('[-]CDNCheck-Check checkASN: {} checkASN失败:{}'.format(ip, str(e)))
+
         return False
 
     async def checkHeader(self, domain):

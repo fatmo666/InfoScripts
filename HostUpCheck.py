@@ -51,7 +51,7 @@ class HostUpCheck(BaseObject):
             newLoop = asyncio.new_event_loop()
             asyncio.set_event_loop(newLoop)
             loop = asyncio.get_event_loop()
-            sem = asyncio.Semaphore(256)
+            sem = asyncio.Semaphore(1024)
 
 
             for domain in self.domains:
@@ -103,7 +103,7 @@ class HostUpCheck(BaseObject):
                                          epilog='\tUsage:\npython3 ' + sys.argv[0] + " --target www.baidu.com --timeout 10")
         parser.add_argument('--target', '-t', help='A target like www.example.com or subdomains.txt, target can be txt file,a domain, a ip address or a class c ip address like 192.168.0.0/24, when target is class c address, the script\
          will not create result folder for every ip', required=True)
-        parser.add_argument('--timeout', help='Set the ping\'s timeout', default=3, required=False)
+        parser.add_argument('--timeout', help='Set the ping\'s timeout', default=3, required=False, type=int)
 
         args = parser.parse_args()
         return args
