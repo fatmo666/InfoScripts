@@ -23,6 +23,7 @@ class OtherSiteSearcher(BaseObject):
         args = self.argparser()
         # 生成主域名列表，待检测域名入队
         target = args.target
+        self.threads = args.threads
         # self.ports = args.port.split(",")
         if not os.path.isfile(target):
             # target = 'http://' + target
@@ -44,12 +45,13 @@ class OtherSiteSearcher(BaseObject):
             asyncio.set_event_loop(newLoop)
             loop = asyncio.get_event_loop()
             resolver = aiodns.DNSResolver(loop=loop)
+            sem = asyncio.Semaphore(self.threads)
 
             for domain in self.domains:
                 if os.path.exists(os.getcwd() + '/result/' + domain + '/') is False:
                     os.mkdir(os.getcwd() + '/result/' + domain + '/')
 
-                tasks.append(asyncio.ensure_future(self.search(domain, resolver)))
+                tasks.append(asyncio.ensure_future(self.search(domain, resolver, sem)))
 
             loop.run_until_complete(asyncio.wait(tasks))
         except KeyboardInterrupt:
@@ -71,20 +73,21 @@ class OtherSiteSearcher(BaseObject):
 
 
 
-    async def search(self, domain, resolver):
-        # 尝试获取IP地址
-        if not re.search(r'\d+\.\d+\.\d+\.\d+', domain):
-            ip = await self.getIP(domain, resolver)
-        else:
-            ip = domain
-        if ip is None:
-            return
+    async def search(self, domain, resolver, sem):
+        async with sem:
+            # 尝试获取IP地址
+            if not re.search(r'\d+\.\d+\.\d+\.\d+', domain):
+                ip = await self.getIP(domain, resolver)
+            else:
+                ip = domain
+            if ip is None:
+                return
 
-        # self.queryResult[domain] = {}
+            # self.queryResult[domain] = {}
 
-        webScanResult = await self.webScan(ip)
-        self.queryResult[domain] = webScanResult
-        pass
+            webScanResult = await self.webScan(ip)
+            self.queryResult[domain] = webScanResult
+            pass
 
     async def getIP(self, domain, resolver):
         """

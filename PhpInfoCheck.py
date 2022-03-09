@@ -23,6 +23,7 @@ class PhpInfoCheck(BaseObject):
         args = self.argparser()
         # 生成主域名列表，待检测域名入队
         target = args.target
+        self.threads = args.threads
         if not os.path.isfile(target):
             # target = 'http://' + target
             self.domains.append(target)
@@ -75,7 +76,7 @@ class PhpInfoCheck(BaseObject):
         self.queryResult[domain] = {}
 
         for item in phpinfoList:
-            sem = asyncio.Semaphore(1024)
+            sem = asyncio.Semaphore(self.threads)
             try:
                 async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:
                     async with sem:

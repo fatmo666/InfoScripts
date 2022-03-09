@@ -25,6 +25,7 @@ class CrawlerInfo(BaseObject):
         args = self.argparser()
         # 生成主域名列表，待检测域名入队
         target = args.target
+        self.threads = args.threads
         if not os.path.isfile(target):
             # target = 'http://' + target
             self.domains.append(target)
@@ -99,6 +100,10 @@ class CrawlerInfo(BaseObject):
             'possible_Creds': [],
         }
 
+        # 打开文件
+        self.fp = open(os.path.dirname(os.path.abspath(__file__)) + '/CheckResult/' + self.fileName + '/crawlerLeakInfo.json', 'w')
+        self.fpApi = open(os.path.dirname(os.path.abspath(__file__)) + '/CheckResult/' + self.fileName + '/crawlerDomainInfo.txt', 'w')
+
     def startQuery(self):
         tasks = []
         for domain in self.domains:
@@ -117,7 +122,7 @@ class CrawlerInfo(BaseObject):
                 while not self.queue.empty():
                     tasks = []
                     i = 0
-                    while i < 1 and not self.queue.empty():
+                    while i < 5 and not self.queue.empty():
                         url = self.queue.get()
                         filename = os.path.basename(url)
                         file_extend = self.get_file_extend(filename)
@@ -240,7 +245,7 @@ class CrawlerInfo(BaseObject):
             self._value_lock.release()
 
     async def send_request(self, url):
-        sem = asyncio.Semaphore(1024)
+        sem = asyncio.Semaphore(self.threads)
         try:
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
                 async with sem:
@@ -352,24 +357,20 @@ class CrawlerInfo(BaseObject):
 
 
     def wirteResult(self):
-        with open(os.path.dirname(os.path.abspath(__file__)) + '/CheckResult/' + self.fileName + '/crawlerLeakInfo.json', 'w') as fp:
-            try:
-                json.dump(self.leak_infos_dict, fp, indent=2)
-                # fp.write(str(self.queryResult))
-                self.logger.info("[+] write" + ' crawlerLeakInfo success')
-            except:
-                self.logger.error("[-] write" + ' crawlerLeakInfo fail')
+        try:
+            json.dump(self.leak_infos_dict, self.fp, indent=2)
+            # fp.write(str(self.queryResult))
+        except:
+            self.logger.error("[-] write" + ' crawlerLeakInfo fail')
 
-        with open(os.path.dirname(os.path.abspath(__file__)) + '/CheckResult/' + self.fileName + '/crawlerDomainInfo.txt', 'w') as fp:
-            try:
-                for item in self.apis:
-                    fp.write(item + '\n')
-                self.logger.info("[+] write" + ' crawlerDomainInfo success')
-            except:
-                self.logger.error("[-] write" + ' crawlerDomainInfo fail')
+        try:
+            for item in self.apis:
+                self.fpApi.write(item + '\n')
+        except:
+            self.logger.error("[-] write" + ' crawlerDomainInfo fail')
 
 
 if __name__ == '__main__':
     cdninfo = CrawlerInfo()
     cdninfo.startQuery()
-    print(cdninfo.leak_infos)
+    # print(cdninfo.leak_infos)

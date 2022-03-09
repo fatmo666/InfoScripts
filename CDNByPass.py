@@ -22,6 +22,7 @@ class CDNByPass(BaseObject):
         args = self.argparser()
         # 生成主域名列表，待检测域名入队
         target = args.target
+        self.threads = args.threads
         if not os.path.isfile(target):
             # target = 'http://' + target
             self.domains.append(target)
@@ -38,12 +39,13 @@ class CDNByPass(BaseObject):
             newLoop = asyncio.new_event_loop()
             asyncio.set_event_loop(newLoop)
             loop = asyncio.get_event_loop()
+            sem = asyncio.Semaphore(self.threads)
 
             for domain in self.domains:
                 if os.path.exists(os.getcwd() + '/result/' + domain + '/') is False:
                     os.mkdir(os.getcwd() + '/result/' + domain + '/')
 
-                tasks.append(asyncio.ensure_future(self.cdnByPass(domain)))
+                tasks.append(asyncio.ensure_future(self.cdnByPass(domain, sem)))
 
             loop.run_until_complete(asyncio.wait(tasks))
         except KeyboardInterrupt:
@@ -64,38 +66,39 @@ class CDNByPass(BaseObject):
                 for item in self.queryResult[domain]:
                     fpResult.write(item + "\n")
 
-    async def cdnByPass(self, domain):
-        self.queryResult[domain] = []
+    async def cdnByPass(self, domain, sem):
+        async with sem:
+            self.queryResult[domain] = []
 
-        icoHashString = await self.calcFaviconHash(domain)
-        iconList = self.shodanObject.getIcoHashList(icoHashString)
-        for item in iconList:
-            self.queryResult[domain].append(item)
-            # if await self.checkIP(item):
-            #     self.queryResult[domain].append(item)
-
-        titleString = await self.getDomainTitle(domain)
-        if titleString != False:
-            titleList = self.shodanObject.getTitleList("title:" + titleString)
-            for item in titleList:
+            icoHashString = await self.calcFaviconHash(domain)
+            iconList = self.shodanObject.getIcoHashList(icoHashString)
+            for item in iconList:
                 self.queryResult[domain].append(item)
                 # if await self.checkIP(item):
                 #     self.queryResult[domain].append(item)
 
-        phpinfoCheck = PhpInfoCheck()
-        phpinfoIP = await phpinfoCheck.getDomainIP(domain)
-        if phpinfoIP != None:
-            self.queryResult[domain].append(phpinfoIP)
-            # if await self.checkIP(phpinfoIP):
-            #     self.queryResult[domain].append(phpinfoIP)
+            titleString = await self.getDomainTitle(domain)
+            if titleString != False:
+                titleList = self.shodanObject.getTitleList("title:" + titleString)
+                for item in titleList:
+                    self.queryResult[domain].append(item)
+                    # if await self.checkIP(item):
+                    #     self.queryResult[domain].append(item)
 
-        censysCheck = CensysObject()
-        censysIp = await censysCheck.getIP(domain)
-        if censysIp != None:
-            for item in censysIp:
-                self.queryResult[domain].append(item)
+            phpinfoCheck = PhpInfoCheck()
+            phpinfoIP = await phpinfoCheck.getDomainIP(domain)
+            if phpinfoIP != None:
+                self.queryResult[domain].append(phpinfoIP)
+                # if await self.checkIP(phpinfoIP):
+                #     self.queryResult[domain].append(phpinfoIP)
 
-        pass
+            censysCheck = CensysObject()
+            censysIp = await censysCheck.getIP(domain)
+            if censysIp != None:
+                for item in censysIp:
+                    self.queryResult[domain].append(item)
+
+            pass
 
     async def getDomainTitle(self, domain):
         """

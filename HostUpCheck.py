@@ -28,6 +28,7 @@ class HostUpCheck(BaseObject):
         args = self.argparser()
         # 生成主域名列表，待检测域名入队
         target = args.target
+        self.threads = args.threads
         self.timeout = args.timeout
         if not os.path.isfile(target):
             # target = 'http://' + target
@@ -51,7 +52,7 @@ class HostUpCheck(BaseObject):
             newLoop = asyncio.new_event_loop()
             asyncio.set_event_loop(newLoop)
             loop = asyncio.get_event_loop()
-            sem = asyncio.Semaphore(1024)
+            sem = asyncio.Semaphore(self.threads)
 
 
             for domain in self.domains:
@@ -104,6 +105,7 @@ class HostUpCheck(BaseObject):
         parser.add_argument('--target', '-t', help='A target like www.example.com or subdomains.txt, target can be txt file,a domain, a ip address or a class c ip address like 192.168.0.0/24, when target is class c address, the script\
          will not create result folder for every ip', required=True)
         parser.add_argument('--timeout', help='Set the ping\'s timeout', default=3, required=False, type=int)
+        parser.add_argument('--threads', help='Set the concurrent quantity', default=1024, required=False, type=int)
 
         args = parser.parse_args()
         return args

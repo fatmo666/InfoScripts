@@ -18,6 +18,7 @@ class DirBruter(BaseObject):
         args = self.argparser()
         # 生成主域名列表，待检测域名入队
         target = args.target
+        self.threads = args.threads
         self.typeList = args.file.split(',')
         if not os.path.isfile(target):
             # target = 'http://' + target
@@ -56,7 +57,7 @@ class DirBruter(BaseObject):
                 if os.path.exists(os.getcwd() + '/result/' + domain + '/') is False:
                     os.mkdir(os.getcwd() + '/result/' + domain + '/')
 
-                tasks.append(asyncio.ensure_future(self.dirBrute('http://' + domain)))
+                tasks.append(asyncio.ensure_future(self.dirBrute('http://' + domain, sem)))
 
             loop.run_until_complete(asyncio.wait(tasks))
         except KeyboardInterrupt:
@@ -78,7 +79,7 @@ class DirBruter(BaseObject):
             with open(os.path.dirname(os.path.abspath(__file__)) + '/Config/Dir/' + filename + '.txt', 'r', encoding='utf-8') as fp:
                 for row in fp.readlines():
                     url = domain + row.strip()
-                    sem = asyncio.Semaphore(1024)
+                    sem = asyncio.Semaphore(self.threads)
                     try:
                         async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:
                             async with sem:

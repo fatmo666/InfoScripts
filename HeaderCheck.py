@@ -18,6 +18,7 @@ class HeaderCheck(BaseObject):
         args = self.argparser()
         # 生成主域名列表，待检测域名入队
         target = args.target
+        self.threads = args.threads
         if not os.path.isfile(target):
             # target = 'http://' + target
             self.domains.append(target)
@@ -63,7 +64,7 @@ class HeaderCheck(BaseObject):
                           'Chrome/79.0.3945.130 Safari/537.36',
             "Cookie": "rememberMe = yyds"
         }
-        sem = asyncio.Semaphore(1024)
+        sem = asyncio.Semaphore(self.threads)
         try:
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:
                 async with sem:
@@ -97,12 +98,14 @@ class HeaderCheck(BaseObject):
         保存结果
         :return:
         """
-        with open('./CheckResult/' + self.fileName + "/" + 'isCDN' + '.txt', 'a') as fp:
-            pass
+        with open('./CheckResult/' + self.fileName + "/" + 'shiro' + '.txt', 'a') as fp:
+            for item in self.shiroList:
+                fp.write(item + '\r\n')
 
         for domain in self.domains:
             with open('./result/' + domain + "/" + 'headerInfo' + '.json', 'w') as fpResult:
-                json.dump(self.queryResult[domain], fpResult, indent=2)
+                if domain in self.queryResult.keys():
+                    json.dump(self.queryResult[domain], fpResult, indent=2)
 
 
 if __name__ == '__main__':
