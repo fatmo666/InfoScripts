@@ -81,7 +81,7 @@ Usage: python3 PhpInfoCheck.py --target www.baidu.com
 
 那么目录`\result\`下会生成文件夹：`\xxx.com\`，且在脚本运行结束后生成文件ports.json
 
-目录`\CheckResult\`会生成文件夹：`2022-03-06-13-21-10`,且在脚本运行结束后生成文件port-open.txt与port-vul.txt
+目录`\CheckResult\`会生成文件夹：`2022-03-06-13-21-10`，且在脚本运行结束后生成文件port-open.txt与port-vul.txt
 
 
 
