@@ -97,12 +97,11 @@ Usage: python3 PhpInfoCheck.py --target www.baidu.com
 - phpinfo信息收集、分析：[PhpInfoCheck.py](https://github.com/fatmo666/InfoScripts/blob/master/PhpInfoCheck.py)
 - 端口扫描：[PortScanner.py](https://github.com/fatmo666/InfoScripts/blob/master/PortScanner.py)
 - 旁站查询：[OtherSiteSearcher.py](https://github.com/fatmo666/InfoScripts/blob/master/OtherSiteSearcher.py)
-
+- 敏感目录/文件探测：[SensitiveInfoScanner.py](https://github.com/fatmo666/InfoScripts/blob/master/SensitiveInfoScanner.py)
 
 
 ## :mouse:TODO
 
-- 敏感目录/文件探测
 - web指纹识别
 - 常见服务弱口令探测
 - 参数爆破
