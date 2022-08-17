@@ -85,6 +85,7 @@ class PhpInfoCheck(BaseObject):
                             response = await req.text('utf-8', 'ignore')
                             status = req.status
                             if status == 200:
+                                self.logger.info("[+] Target: " + domain + " have phpinfo!")
                                 self.infoCollecter(domain, response)
                                 self.get_parsed_info(domain)
             except CancelledError:
