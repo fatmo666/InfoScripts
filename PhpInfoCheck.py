@@ -60,16 +60,16 @@ class PhpInfoCheck(BaseObject):
         保存结果
         :return:
         """
-        with open(os.path.dirname(os.path.abspath(__file__)) + '/CheckResult/' + self.fileName + "/" + 'phpinfo' + '.txt', 'a') as fp:
+        with open(os.getcwd() + '/CheckResult/' + self.fileName + "/" + 'phpinfo' + '.txt', 'a') as fp:
             for item in self.queryResult.keys():
                 fp.write(item + '\n')
 
-                with open(os.path.dirname(os.path.abspath(__file__)) + '/result/' + item + "/" + 'PhpInfoVul' + '.txt',
+                with open(os.getcwd() + '/result/' + item + "/" + 'PhpInfoVul' + '.txt',
                           'w') as fpResult:
                     for i in self.result[item]:
                         fpResult.write(str(i) + '\n')
 
-                with open(os.path.dirname(os.path.abspath(__file__)) + '/result/' + item + "/" + 'phpinfo' + '.json', 'w') as fpResult:
+                with open(os.getcwd() + '/result/' + item + "/" + 'phpinfo' + '.json', 'w') as fpResult:
                     json.dump(self.queryResult[item], fpResult, indent=2)
 
     async def infoCollect(self, domain):
