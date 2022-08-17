@@ -56,7 +56,7 @@ class HostUpCheck(BaseObject):
 
 
             for domain in self.domains:
-                if os.path.exists(os.path.abspath(__file__) + '/CheckResult/' + self.fileName + "/") is False:
+                if os.path.exists(os.getcwd() + '/CheckResult/' + self.fileName + "/") is False:
                     # os.mkdir(os.path.abspath(__file__) + '/CheckResult/' + self.fileName + "/")
                     os.mkdir(os.getcwd() + '/CheckResult/' + self.fileName + "/")
 

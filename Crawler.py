@@ -239,6 +239,7 @@ class CrawlerInfo(BaseObject):
                     self.leak_infos.append(match_tuple)
                     self.leak_infos_match.append(match)
                     self.leak_infos_dict[key].append(match)
+                    self.logger.info("[+] Find info: " + match + " !")
         except Exception as e:
             self.logger.warning(e)
         finally:
