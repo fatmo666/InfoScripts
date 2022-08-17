@@ -1,3 +1,6 @@
 aionmap
 mmh3
 tldextract
+IPy
+aioping
+aiohttp

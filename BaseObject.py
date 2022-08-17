@@ -67,10 +67,10 @@ class BaseObject(object):
             os.mkdir(os.getcwd() + '/log/')
         if os.path.exists(os.getcwd() + '/result/') is False:
             os.mkdir(os.getcwd() + '/result/')
-        if os.path.exists(os.getcwd() + '/RunResult/') is False:
-            os.mkdir(os.getcwd() + '/RunResult/')
-        if os.path.exists(os.getcwd() + '/RunResult/' + self.fileName + '/') is False:
-            os.mkdir(os.getcwd() + '/RunResult/' + self.fileName + '/')
+        if os.path.exists(os.getcwd() + '/CheckResult/') is False:
+            os.mkdir(os.getcwd() + '/CheckResult/')
+        # if os.path.exists(os.getcwd() + '/CheckResult/' + self.fileName + '/') is False:
+        #     os.mkdir(os.getcwd() + '/CheckResult/' + self.fileName + '/')
 
 
     def argparser(self):

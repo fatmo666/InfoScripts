@@ -32,7 +32,7 @@ class HostUpCheck(BaseObject):
         self.timeout = args.timeout
         if not os.path.isfile(target):
             # target = 'http://' + target
-            if str(target.split('.')[-1]) >= '0/24':
+            if str(target.split('.')[-1]) == '0/24':
                 self.writeFlag = False
                 for ip in IPy.IP(target):
                     self.domains.append(str(ip))
@@ -56,6 +56,10 @@ class HostUpCheck(BaseObject):
 
 
             for domain in self.domains:
+                if os.path.exists(os.path.abspath(__file__) + '/CheckResult/' + self.fileName + "/") is False:
+                    # os.mkdir(os.path.abspath(__file__) + '/CheckResult/' + self.fileName + "/")
+                    os.mkdir(os.getcwd() + '/CheckResult/' + self.fileName + "/")
+
                 if self.writeFlag == True:
                     if os.path.exists(os.getcwd() + '/result/' + domain + '/') is False:
                         os.mkdir(os.getcwd() + '/result/' + domain + '/')
@@ -64,7 +68,7 @@ class HostUpCheck(BaseObject):
 
             loop.run_until_complete(asyncio.wait(tasks))
         except KeyboardInterrupt:
-            self.logger.info('[+]Break From Queue.')
+            self.logger.info('[+] Break From Queue.')
         except CancelledError:
             pass
 
@@ -76,6 +80,7 @@ class HostUpCheck(BaseObject):
         if pingResult == True:
             self.hostUp.append(domain)
             self.queryResult[domain]['HostUp'] = "1"
+            self.logger.info('[+] Target: ' + domain + ' up!')
             return True
         else:
             self.hostDown.append(domain)
